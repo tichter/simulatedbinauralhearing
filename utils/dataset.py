@@ -1,4 +1,4 @@
-from soundProcessor import SoundProcessor
+from freqSoundProcessor import FreqSoundProcessor
 from hrtfloader import HRTFLoader
 
 import torch
@@ -8,77 +8,112 @@ from tqdm import tqdm
 
 import pickle
 import os
+import uuid
 
 class DataSet(Dataset):
-    def __init__(self,nsounds,db_levels=[45,60,75],train=True,randmanip=False,add_ele=False,doublepolar=False):
+    def __init__(self,name_add,nsounds=100000,db_levels=[],train=True,add_ele=False,doublepolar=False,single=True):
         super(DataSet,self).__init__()
 
-        self.datasetpath = "D:\\1_Uni\\0_Master\\5_CI-Thesis\\01Deliverable\\Code\\datasets\\"
-        self.name = "{}-{}-{}-{}-{}-{}.pkl".format(nsounds,db_levels,train,randmanip,add_ele,doublepolar)
-        self.edhrtfloader = HRTFLoader(ED=True,add_ele=add_ele,doublepolar=doublepolar)
+        #self.curUUID = str(uuid.uuid4())
+        #print("UUID is: {}".format(self.curUUID))
 
+        self.datasetpath = "D:\\1_Uni\\0_Master\\5_CI-Thesis\\05FinalCode\\datasets\\"
+        self.edhrtfloader = HRTFLoader(ED=True,add_ele=add_ele,doublepolar=doublepolar)
+        self.name = "{}-{}-{}-{}-{}".format(nsounds,add_ele,doublepolar,single,name_add)
 
         self.nsounds = nsounds
-        self.db_levels = db_levels
         self.train = train
-        self.randmanip = randmanip
         self.add_ele = add_ele
         self.doublepolar = doublepolar
+        self.single = single
+
+        self.db_levels = db_levels
+        sp = FreqSoundProcessor(db=90,add_ele=self.add_ele,
+                            doublepolar=self.doublepolar,edhrtfloader=self.edhrtfloader)
+        sp.generateNoise()
+        sp.bandpassfilter(f_min=100,f_max=12000)
+        sp.setdBSPL()
+        sp.calcSound(single=self.single)
+
+        self.return_freqs = sp.return_freqs
 
         self.sps = []
         self.data = []
         self.labels = []
 
-        self.bands = [[100,12000],[100,1000],[1000,2000],[2000,3000],[3000,4000],
-                      [4000,5000],[5000,6000],[7000,8000],[8000,9000],[9000,10000],
-                      [1000,5000],[5000,12000],[2000,8000]]
+        self.intensities = []
+        self.band_starts = []
+        self.octaves = []
 
         # read created dataset or create new one
-        if os.path.exists(self.datasetpath+self.name):
+        if os.path.exists(self.datasetpath+self.name+"data.npy"):
+            #print("Loader Currently Not Working")
             self.loadDataset()
         else:
             self.createDataset()
+            np.save("D:\\1_Uni\\0_Master\\5_CI-Thesis\\05FinalCode\\datasets\\intensities{}.npy".format(self.name),self.intensities)
+            np.save("D:\\1_Uni\\0_Master\\5_CI-Thesis\\05FinalCode\\datasets\\band_starts{}.npy".format(self.name),self.band_starts)
+            np.save("D:\\1_Uni\\0_Master\\5_CI-Thesis\\05FinalCode\\datasets\\octaves{}.npy".format(self.name),self.octaves)
+            
+        #self.calculateData()
 
-        self.calculateData()
+
+
 
     def createDataset(self):
-        if self.randmanip:
+        if self.train:
             for i in tqdm(range(self.nsounds)):
-                dbl = np.random.choice(self.db_levels)
-                band = self.bands[np.random.choice(len(self.bands))]
-                print("db: {} band: {}".format(dbl,band))
-                sp = SoundProcessor(db=dbl,add_ele=self.add_ele,doublepolar=self.doublepolar,edhrtfloader=self.edhrtfloader)
+                intensity = np.random.randint(40,91)
+
+                """
+                #delete below until multiline comment
+                bands = [[100,12000],[100,1000],[1000,2000],[2000,3000],[3000,4000],
+                          [4000,5000],[5000,6000],[7000,8000],[8000,9000],[9000,10000],
+                          [1000,5000],[5000,12000],[2000,8000]]
+
+                band = bands[np.random.choice(len(bands))]
+                band_start = band[0]
+                band_end = band[1]
+
+                """
+                # this is the correct version
+                band_start = np.random.randint(100,6001)
+                band_end = np.random.randint(band_start+100,12000)
+
+                self.intensities.append(intensity)
+                self.band_starts.append(band_start)
+                self.octaves.append(band_end)
+
+                sp = FreqSoundProcessor(db=intensity,add_ele=self.add_ele,
+                                    doublepolar=self.doublepolar,edhrtfloader=self.edhrtfloader)
                 sp.generateNoise()
-                sp.bandpassfilter(f_min=band[0],f_max=band[1])
+                if np.random.uniform() < 0.01:
+                    sp.bandpassfilter(f_min=100,f_max=12000)
+                else:
+                    #sp.bandpassfilter(f_min=band_start,f_max=min(band_start*octaves,12000))
+                    sp.bandpassfilter(f_min=band_start,f_max=band_end)
                 sp.setdBSPL()
-                sp.calcSound()
-                self.sps.append(sp)
+                sp.calcSound(single=self.single)
+                data,labels = sp.getData()
+                [self.data.append(d) for d in data]
+                [self.labels.append(l) for l in labels]
+
+                #self.sps.append(sp)
+            self.writeDataset()
+
         else:
             for i in tqdm(range(self.nsounds)):
                 for dbl in self.db_levels:
-                    if self.train:
-                        for band in self.bands:
-                            sp = SoundProcessor(db=dbl,add_ele=self.add_ele,doublepolar=self.doublepolar,edhrtfloader=self.edhrtfloader)
-                            sp.generateNoise()
-                            sp.bandpassfilter(f_min=band[0],f_max=band[1])
-                            sp.setdBSPL()
-                            sp.calcSound()
-                            self.sps.append(sp)
-                    else:
-                        sp = SoundProcessor(db=dbl,add_ele=False,doublepolar=self.doublepolar,edhrtfloader=self.edhrtfloader)
-                        sp.generateNoise()
-                        sp.bandpassfilter()
-                        sp.setdBSPL()
-                        sp.calcSound()
-                        self.sps.append(sp)
-        self.writeDataset()
+                    sp = FreqSoundProcessor(db=dbl,add_ele=self.add_ele,
+                                        doublepolar=self.doublepolar,edhrtfloader=self.edhrtfloader)
+                    sp.generateNoise()
+                    sp.bandpassfilter()
+                    sp.setdBSPL()
+                    sp.calcSound(single=self.single)
+                    self.sps.append(sp)
 
+            self.calculateData()
 
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self,idx):
-        return (torch.from_numpy(self.data[idx]).float(), torch.from_numpy(np.array(self.labels[idx])).float())
 
     def calculateData(self):
         self.data = []
@@ -89,11 +124,17 @@ class DataSet(Dataset):
             [self.data.append(d) for d in data]
             [self.labels.append(l) for l in labels]
 
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self,idx):
+        return (torch.from_numpy(self.data[idx]).float(), torch.from_numpy(np.array(self.labels[idx])).float())
+
     def highpassFilter(self,f_min=3000,f_max=12000):
         for sp in self.sps:
             sp.bandpassfilter(f_min=f_min,f_max=f_max)
             sp.setdBSPL()
-            sp.calcSound()
+            sp.calcSound(single=False)
 
         self.calculateData()
 
@@ -101,7 +142,7 @@ class DataSet(Dataset):
         for sp in self.sps:
             sp.bandpassfilter(f_min=f_min,f_max=f_max)
             sp.setdBSPL()
-            sp.calcSound()
+            sp.calcSound(single=False)
 
         self.calculateData()
 
@@ -109,39 +150,32 @@ class DataSet(Dataset):
         for sp in self.sps:
             sp.bandpassfilter(f_min=f_min,f_max=f_max)
             sp.setdBSPL()
-            sp.calcSound()
+            sp.calcSound(single=False)
 
         self.calculateData()
 
-    def invertChannels(self,f_min=100,f_max=12000):
-        self.data = []
-        self.labels = []
-        for sp in self.sps:
-            sp.bandpassfilter(f_min=f_min,f_max=f_max)
-            sp.setdBSPL()
-            sp.calcSound()
-
-            data,labels = sp.getData()
-
-            # swap channels
-            data = [np.concatenate([d[int(len(d)/2):],d[:int(len(d)/2)]]) for d in data]
-            [self.data.append(d) for d in data]
-            [self.labels.append(l) for l in labels]
-
     def getFreqBins(self):
-        print(len(self.sps[0].return_freqs))
-        return self.sps[0].return_freqs
+        print(len(self.return_freqs))
+        return self.return_freqs
 
     def writeDataset(self):
         print("Writing dataset...")
         print("{}".format(self.datasetpath+self.name))
+        np.save("{}".format(self.datasetpath+self.name+"data.npy"),self.data)
+        np.save("{}".format(self.datasetpath+self.name+"labels.npy"),self.labels)
+
+        """
         with open(self.datasetpath+self.name,'wb') as f:
             for sp in self.sps:
                 pickle.dump(sp,f)
-
+        """
     def loadDataset(self):
         print("Dataset already created...")
         print("{}".format(self.datasetpath+self.name))
+        self.data = np.load("{}".format(self.datasetpath+self.name+"data.npy"))
+        self.labels = np.load("{}".format(self.datasetpath+self.name+"labels.npy"))
+
+        """
         with open(self.datasetpath+self.name,'rb') as f:
             eof = False
             while not eof:
@@ -149,3 +183,4 @@ class DataSet(Dataset):
                     self.sps.append(pickle.load(f))
                 except EOFError as error:
                     eof = True
+        """

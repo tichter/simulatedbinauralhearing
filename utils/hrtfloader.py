@@ -57,6 +57,10 @@ class HRTFLoader():
                     self.returnHRTFs.append(self.hrtfs[:,i].T)
                     self.returnLabels.append(azilabel)
 
+    def getAzimuthFrontal(self):
+        self.setReturnAzimuthFrontal()
+        return self.returnHRTFs,self.returnLabels
+
     def loadKEMAR(self,micloc="ED"):
         """
         Function to load the correct OldenburgDB HRTFs into a general dataformat
@@ -65,19 +69,19 @@ class HRTFLoader():
             print("Loading HRTFs from OldenburgDB. Mic Location: {}".format(micloc))
 
             if micloc is "ED":
-                KEMARmat = scipy.io.loadmat("D:\\1_Uni\\0_Master\\5_CI-Thesis\\01Deliverable\\Code\\utils\\KEMAR-ED.mat")
+                KEMARmat = scipy.io.loadmat("D:\\1_Uni\\0_Master\\5_CI-Thesis\\05FinalCode\\utils\\KEMAR-ED.mat")
                 print("Kemar eardrum loaded.")
             elif micloc is "BTEF":
-                KEMARmat = scipy.io.loadmat("D:\\1_Uni\\0_Master\\5_CI-Thesis\\01Deliverable\\Code\\utils\\KEMAR-BTE_fr.mat")
+                KEMARmat = scipy.io.loadmat("D:\\1_Uni\\0_Master\\5_CI-Thesis\\05FinalCode\\utils\\KEMAR-BTE_fr.mat")
             elif micloc is "BTEM":
-                KEMARmat = scipy.io.loadmat("D:\\1_Uni\\0_Master\\5_CI-Thesis\\01Deliverable\\Code\\utils\\KEMAR-BTE_mid.mat")
+                KEMARmat = scipy.io.loadmat("D:\\1_Uni\\0_Master\\5_CI-Thesis\\05FinalCode\\utils\\KEMAR-BTE_mid.mat")
             elif micloc is "BTER":
-                KEMARmat = scipy.io.loadmat("D:\\1_Uni\\0_Master\\5_CI-Thesis\\01Deliverable\\Code\\utils\\KEMAR-BTE_rear.mat")
+                KEMARmat = scipy.io.loadmat("D:\\1_Uni\\0_Master\\5_CI-Thesis\\05FinalCode\\utils\\KEMAR-BTE_rear.mat")
             else:
                 print("Cannot find the right HRTF matfile in the OldenburgDB.")
 
             if self.doublepolar:
-                azelmat = scipy.io.loadmat("D:\\1_Uni\\0_Master\\5_CI-Thesis\\01Deliverable\\Code\\utils\\doublepolarOlHeaDcoords.mat")
+                azelmat = scipy.io.loadmat("D:\\1_Uni\\0_Master\\5_CI-Thesis\\05FinalCode\\utils\\doublepolarOlHeaDcoords.mat")
                 locs = [azelmat['ReturnAz'].T[0],azelmat['ReturnEle'].T[0]]
             else:
                 locs = KEMARmat['M_directions'] # [azimuth,elevation]

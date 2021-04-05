@@ -14,9 +14,13 @@ class BinauralNeuralNetwork(nn.Module):
         #self.act = nn.ReLU()
 
         self.linearact = None
+        self.temp = None
 
     def forward(self,x):
-        x = self.act(self.linear1(x))
+        x = self.linear1(x)
+        self.temp = x
+        #x = self.act(self.linear1(x))
+        x = self.act(x)
         self.linearact = x
         x = self.linear2(x)
         return x
@@ -25,6 +29,7 @@ class BinauralNeuralNetwork(nn.Module):
         return torch.mean(self.linearact).detach().cpu().numpy()
 
     def getHiddenActivations(self):
+        #return self.temp.detach().cpu().numpy()
         return self.linearact.detach().cpu().numpy()
 
 class L3BinauralNeuralNetwork(nn.Module):

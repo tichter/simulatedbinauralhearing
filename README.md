@@ -10,3 +10,5 @@ Note that you need to specify the network configurations in the two files.
 
 Additionally, you can choose to construct the training data with all frontal HRTFs (add_ele = True) or only with HRTFs with zero elevation (add_ele = False).
 The doublepolar parameter, indicates whether the azimuth labels are in navigational or double polar coordinates.
+
+The git_empty.txt files only have the purpose of uploading empty folders to git, such that the folder structure for the generated plots is preserved. 
